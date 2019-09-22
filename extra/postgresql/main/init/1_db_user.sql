@@ -1,0 +1,2 @@
+CREATE USER classic WITH SUPERUSER PASSWORD 'nopassword';
+CREATE DATABASE proxybase OWNER classic;

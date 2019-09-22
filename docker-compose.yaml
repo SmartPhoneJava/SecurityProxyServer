@@ -1,0 +1,21 @@
+version: '3'
+services:
+
+  proxy-db:
+    build:
+      dockerfile: Dockerfile
+      context: ./extra/postgresql/main/
+    ports:
+      - "5429:5432"    
+
+  proxy-main:
+    build:
+      dockerfile: ./Dockerfile
+      context: .
+    depends_on:
+      - "proxy-db"
+    ports:
+      - 8888:8888
+    command: /bin/sh -c "go run main.go"
+    volumes:
+    - ./:/proxy
