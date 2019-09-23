@@ -10,12 +10,24 @@ services:
 
   proxy-main:
     build:
-      dockerfile: ./Dockerfile
+      dockerfile: ./services/proxy/Dockerfile
       context: .
     depends_on:
       - "proxy-db"
     ports:
       - 8888:8888
-    command: /bin/sh -c "go run main.go"
+    command: /bin/sh -c "go run services/proxy/main.go"
+    volumes:
+    - ./:/se
+
+  proxy-repeater:
+    build:
+      dockerfile: ./services/repeater/Dockerfile
+      context: .
+    depends_on:
+      - "proxy-db"
+    ports:
+      - 8889:8889
+    command: /bin/sh -c "go run services/repeater/main.go"
     volumes:
     - ./:/proxy
