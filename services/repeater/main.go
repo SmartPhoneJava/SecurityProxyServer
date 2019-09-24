@@ -48,7 +48,7 @@ func main() {
 		ReadTimeout:    readTimeout,
 		WriteTimeout:   writeTimeout,
 		IdleTimeout:    idleTimeout,
-		Handler:        internal.Router(db),
+		Handler:        internal.Router(*db),
 		MaxHeaderBytes: maxHeaderBytes,
 		TLSNextProto:   make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 		TLSConfig:      config,

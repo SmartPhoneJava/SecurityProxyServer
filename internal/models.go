@@ -6,9 +6,11 @@ import (
 )
 
 // RequestDB wrapper for placing and retrieving http.Request from database
+//easyjson:json
 type RequestDB struct {
 	ID           int               `json:"id" db:"id"`
 	Method       string            `json:"method" db:"method"`
+	Scheme       string            `json:"scheme" db:"scheme"`
 	RemoteAddr   string            `json:"address" db:"address"`
 	Body         string            `json:"body" db:"body"`
 	HeaderRaw    string            `json:"header" db:"header"`
@@ -19,6 +21,7 @@ type RequestDB struct {
 }
 
 // RequestsDB - slice of requsts from database
+//easyjson:json
 type RequestsDB struct {
 	Requests []RequestDB `json:"requests"`
 }
@@ -46,7 +49,9 @@ func (rdb *RequestDB) MakeHeader() {
 		if len(kv) != 2 {
 			continue
 		}
-		rdb.Header[kv[0]] = kv[1]
+		if kv[0] != "User-Agent" {
+			rdb.Header[kv[0]] = kv[1]
+		}
 	}
 }
 
@@ -68,4 +73,26 @@ func (rdb *RequestDB) MakeHeaderRAW() {
 		counter++
 	}
 	rdb.HeaderRaw = headers
+}
+
+// JSONtype is interface to be sent by json
+type JSONtype interface {
+	MarshalJSON() ([]byte, error)
+	UnmarshalJSON(data []byte) error
+}
+
+// Result - every handler return it
+//easyjson:json
+type Result struct {
+	code  int
+	place string
+	send  interface{}
+	err   error
+}
+
+//easyjson:json
+type ResultModel struct {
+	Place   string `json:"place"`
+	Success bool   `json:"success"`
+	Message string `json:"message"`
 }

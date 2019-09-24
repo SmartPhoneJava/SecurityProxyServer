@@ -48,7 +48,7 @@ func main() {
 		ReadTimeout:    readTimeout,
 		WriteTimeout:   writeTimeout,
 		IdleTimeout:    idleTimeout,
-		Handler:        http.HandlerFunc(internal.Handler(db)),
+		Handler:        http.HandlerFunc(internal.ProxyHandler(db)),
 		MaxHeaderBytes: maxHeaderBytes,
 		TLSNextProto:   make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 		TLSConfig:      config,

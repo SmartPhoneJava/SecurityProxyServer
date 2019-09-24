@@ -82,14 +82,6 @@ func saveReader1(source io.ReadCloser) {
 	fmt.Printf("\nLength: %d, Error:%v", length, err)
 	source.Close()
 	source = reader
-	// bodyBytes, err := ioutil.ReadAll(source)
-	// if err != nil {
-	// 	fmt.Println("err: ", err.Error())
-	// 	return
-	// }
-	// source.Close() //  must close
-	// source = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
-	// fmt.Printf("\nRead: %s", bodyBytes)
 }
 
 func copyHeader(dst, src http.Header) {
@@ -100,10 +92,10 @@ func copyHeader(dst, src http.Header) {
 	}
 }
 
-func Handler(db *DB) func(w http.ResponseWriter, r *http.Request) {
+func ProxyHandler(db *DB) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("catched")
-		//go saveRequest(r, r.Method == http.MethodConnect, *db)
+		go saveRequest(r, r.Method == http.MethodConnect, *db)
 		if r.Method == http.MethodConnect {
 			HandleTunneling(w, r)
 		} else {
@@ -166,9 +158,9 @@ func saveRequest(r *http.Request, https bool, db DB) {
 		Header:     make(map[string]string),
 	}
 	if https {
-		rdb.RemoteAddr = "https://" + r.URL.Host
+		rdb.Scheme = "https"
 	} else {
-		rdb.RemoteAddr = "http://" + r.URL.Host
+		rdb.Scheme = "http"
 	}
 	for k, v := range r.Header {
 		rdb.Header[k] = v[0]

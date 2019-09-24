@@ -1,6 +1,14 @@
 package internal
 
-import "github.com/gorilla/mux"
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/gorilla/mux"
+)
 
 type Handler struct {
 	db DB
@@ -12,51 +20,85 @@ func Router(db DB) *mux.Router {
 
 	var H = &Handler{db}
 
-	r.HandleFunc("/history", H.GetHistory).Methods("GET")
-	r.HandleFunc("/history/{id}", H.HandleUsers).Methods("GET")
+	r.HandleFunc("/", func(rw http.ResponseWriter, r *http.Request) {
+		rw.Write([]byte("ok"))
+		//rw.WriteHeader(200)
+	})
+	r.HandleFunc("/history", H.GetRequests).Methods("GET")
+	r.HandleFunc("/history/{id}", H.GetRequest).Methods("GET")
+	r.HandleFunc("/history/{id}/send", H.SendRequest)
 
 	return r
 }
 
-
 func (H *Handler) GetRequests(rw http.ResponseWriter, r *http.Request) {
-	const place = "projectGet"
+	const place = "GetRequests"
 
-	requests, err := H.db.GetRequests()
+	scheme := r.URL.Query().Get("scheme")
+	method := r.URL.Query().Get("method")
+
+	requests, err := H.db.GetRequests(scheme, method)
 	if err != nil {
-
+		SendResult(rw, NewResult(http.StatusInternalServerError, place, nil, err))
 	} else {
-		SendResult(rw,  NewResult(http.StatusOK, place, &requests, err)) 
+		SendResult(rw, NewResult(http.StatusOK, place, requests, err))
 	}
 }
 
 func (H *Handler) GetRequest(rw http.ResponseWriter, r *http.Request) {
-	const place = "projectGet"
+	const place = "GetRequest"
 
 	id, err := IDFromPath(r, "id")
-	if (err != nil) {
-
+	if err != nil {
+		SendResult(rw, NewResult(http.StatusInternalServerError, place, nil, err))
 	}
 
 	request, err := H.db.GetRequest(id)
-	return NewResult(http.StatusOK, place, &request, err)
+	if err != nil {
+		SendResult(rw, NewResult(http.StatusInternalServerError, place, nil, err))
+	} else {
+		SendResult(rw, NewResult(http.StatusOK, place, request, err))
+	}
 }
 
-// Result - every handler return it
-type Result struct {
-	code  int
-	place string
-	send  JSONtype
-	err   error
+func (H *Handler) SendRequest(rw http.ResponseWriter, r *http.Request) {
+	const place = "GetRequest"
+
+	id, err := IDFromPath(r, "id")
+	if err != nil {
+		SendResult(rw, NewResult(http.StatusInternalServerError, place, nil, err))
+	}
+
+	request, err := H.db.GetRequest(id)
+	request.MakeHeader()
+	sendSavedRequest(rw, *request)
 }
 
-// JSONtype is interface to be sent by json
-type JSONtype interface {
-	MarshalJSON() ([]byte, error)
-	UnmarshalJSON(data []byte) error
+func sendSavedRequest(w http.ResponseWriter, rdb RequestDB) error {
+	req, err := restoreRequest(rdb)
+	if err != nil {
+		return err
+	}
+	return HandleHTTP(w, req)
 }
 
-func NewResult(code int, place string, send JSONtype, err error) Result {
+func restoreRequest(rdb RequestDB) (*http.Request, error) {
+	body := strings.NewReader(rdb.Body)
+	req, err := http.NewRequest(rdb.Method, rdb.Scheme+"://"+rdb.RemoteAddr, body)
+	if err != nil {
+		return req, err
+	}
+	for k, v := range rdb.Header {
+		req.Header.Set(k, v)
+	}
+
+	if rdb.UserLogin != "" && rdb.UserPassword != "" {
+		req.SetBasicAuth(rdb.UserLogin, rdb.UserPassword)
+	}
+	return req, err
+}
+
+func NewResult(code int, place string, send interface{}, err error) Result {
 	return Result{
 		code:  code,
 		place: place,
@@ -76,33 +118,32 @@ func SendResult(rw http.ResponseWriter, result Result) {
 		sendSuccessJSON(rw, result.send, result.place)
 	}
 	rw.WriteHeader(result.code)
-	Debug(result.err, result.code, result.place)
 }
 
 // SendErrorJSON send error json
 func sendErrorJSON(rw http.ResponseWriter, catched error, place string) {
-	result := models.Result{
+	result := ResultModel{
 		Place:   place,
 		Success: false,
 		Message: catched.Error(),
 	}
 
-	if b, err := result.MarshalJSON(); err == nil {
+	if b, err := json.Marshal(result); err == nil {
 		rw.Write(b)
 	}
 }
 
 // SendSuccessJSON send object json
-func sendSuccessJSON(rw http.ResponseWriter, result JSONtype, place string) {
+func sendSuccessJSON(rw http.ResponseWriter, result interface{}, place string) {
 	if result == nil {
-		result = &models.Result{
+		result = &ResultModel{
 			Place:   place,
 			Success: true,
 			Message: "no error",
 		}
 	}
-	if b, err := result.MarshalJSON(); err == nil {
-		utils.Debug(false, string(b))
+
+	if b, err := json.Marshal(result); err == nil {
 		rw.Write(b)
 	}
 }
@@ -114,7 +155,7 @@ func IDFromPath(r *http.Request, name string) (int32, error) {
 		return 0, err
 	}
 	if val < 0 {
-		return 0, re.ID()
+		return 0, errors.New("ID cant be less then 1")
 	}
 	return int32(val), nil
 }
