@@ -1,28 +1,42 @@
-package internal
+package database
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
 	//_ "github.com/jackc/pgx/v4"
+	"github.com/SmartPhoneJava/SecurityProxyServer/internal/models"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	//_ "github.com/lib/pq" // here
 )
 
 type DB struct{ db *sqlx.DB }
 
-func Init(link string, maxOpen, maxIdle int, ttl time.Duration) (*DB, error) {
+type Settings struct {
+	User     string
+	Password string
+	Addr     string
+	Port     string
+	Db       string
+	MaxOpen  int
+	MaxIdle  int
+	TTL      time.Duration
+}
+
+func Init(settings Settings) (*DB, error) {
+	link := "postgres://" + settings.User + ":" + settings.Password + "@" +
+		settings.Addr + settings.Port + "/" + settings.Db + "?sslmode=disable"
 	db, err := sqlx.Connect("postgres", link)
 
 	if err != nil {
 		return nil, err
 	}
 
-	db.SetMaxOpenConns(maxOpen)
-	db.SetMaxIdleConns(maxIdle)
-	db.SetConnMaxLifetime(ttl)
+	db.SetMaxOpenConns(settings.MaxOpen)
+	db.SetMaxIdleConns(settings.MaxIdle)
+	db.SetConnMaxLifetime(settings.TTL)
 
 	return &DB{db}, nil
 }
@@ -32,8 +46,17 @@ func (db *DB) Close() error {
 }
 
 // CreateRequest add requesat to database
-func (db *DB) CreateRequest(rdb *RequestDB) error {
+func (db *DB) CreateRequest(rdb *models.RequestDB) error {
 	rdb.MakeHeaderRAW()
+
+	fmt.Println("method:", rdb.Method)
+	fmt.Println("scheme:", rdb.Scheme)
+	fmt.Println("address:", rdb.RemoteAddr)
+	fmt.Println("header:", rdb.Header)
+	fmt.Println("body:", rdb.Body)
+	fmt.Println("userlogin:", rdb.UserLogin)
+	fmt.Println("userpassword:", rdb.UserPassword)
+
 	sqlInsert := `
 	INSERT INTO Request(method, scheme, address, header, body,
 		userlogin, userpassword) VALUES
@@ -41,11 +64,6 @@ func (db *DB) CreateRequest(rdb *RequestDB) error {
 			:userlogin, :userpassword)
 			RETURNING *;
 		`
-	//_, err := db.db.Exec(sqlInsert, rdb)
-	/*
-			row := db.db.QueryRowx(sqlInsert)
-		err := row.Scan(rdb)
-	*/
 	return db.createAndReturnStruct(sqlInsert, rdb)
 }
 
@@ -99,7 +117,26 @@ func applyMethod(statement *string, counter *int, method string) {
 	})
 }
 
-func (db *DB) GetRequests(scheme, method string) (*RequestsDB, error) {
+func applyAddress(statement *string, counter *int, address string) {
+	applyParameter(statement, counter, addToQuery("address", address), func() bool {
+		return address != ""
+	})
+}
+
+func applyLimit(statement *string, limit string) {
+	if _, err := strconv.Atoi(limit); err != nil {
+		limit = "20"
+	}
+	*statement += " limit " + limit + " "
+}
+
+func applyDesc(statement *string, last string) {
+	if last == "true" || last == "1" || last == "+" {
+		*statement += " order by id desc "
+	}
+}
+
+func (db *DB) GetRequests(scheme, method, limit, last, address string) (*models.RequestsDB, error) {
 
 	var (
 		statement = `select * from Request`
@@ -110,6 +147,9 @@ func (db *DB) GetRequests(scheme, method string) (*RequestsDB, error) {
 	var counter = 0
 	applyScheme(&statement, &counter, scheme)
 	applyMethod(&statement, &counter, method)
+	applyAddress(&statement, &counter, address)
+	applyDesc(&statement, last)
+	applyLimit(&statement, limit)
 
 	fmt.Println("statement:", statement)
 
@@ -119,10 +159,10 @@ func (db *DB) GetRequests(scheme, method string) (*RequestsDB, error) {
 	}
 	defer rows.Close()
 
-	requests := make([]RequestDB, 0)
+	requests := make([]models.RequestDB, 0)
 
 	for rows.Next() {
-		var request RequestDB
+		var request models.RequestDB
 		err = rows.StructScan(&request)
 		if err != nil {
 			break
@@ -132,16 +172,22 @@ func (db *DB) GetRequests(scheme, method string) (*RequestsDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	requestsDB := &RequestsDB{
+	requestsDB := &models.RequestsDB{
 		Requests: requests,
 	}
 	return requestsDB, err
 }
 
-func (db *DB) GetRequest(id int32) (*RequestDB, error) {
+func (db *DB) GetRequest(id int32) (*models.RequestDB, error) {
 	statement := `select * from Request where id = $1`
 	row := db.db.QueryRowx(statement, id)
-	requestDB := &RequestDB{}
+	requestDB := &models.RequestDB{}
 	err := row.StructScan(requestDB)
 	return requestDB, err
+}
+
+func (db *DB) DeleteRequests() error {
+	statement := `delete from Request`
+	_, err := db.db.Exec(statement)
+	return err
 }

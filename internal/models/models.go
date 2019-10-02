@@ -1,4 +1,4 @@
-package internal
+package models
 
 import (
 	"strings"
@@ -84,10 +84,10 @@ type JSONtype interface {
 // Result - every handler return it
 //easyjson:json
 type Result struct {
-	code  int
-	place string
-	send  interface{}
-	err   error
+	Code  int
+	Place string
+	Send  interface{}
+	Err   error
 }
 
 //easyjson:json
