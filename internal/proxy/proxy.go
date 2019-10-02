@@ -153,22 +153,18 @@ func (proxy *Proxy) HandleTunneling(w http.ResponseWriter, r *http.Request) {
 	go proxy.transfer(destConn, tlsConn, true, r.URL.Host)
 	go proxy.transfer(tlsConn, destConn, false, r.URL.Host)
 }
-<<<<<<< HEAD
 
 func (proxy *Proxy) writeToDB(buf *bytes.Buffer, addr string) {
-	fmt.Println(addr, " - control start")
 	a := make([]byte, 1024*1024*8)
 	for {
 		for {
 			select {
 			case <-time.After(3 * time.Second):
-				fmt.Println(addr, " - control timeout")
 				return
 			default:
 				_, err := buf.Read(a)
 				if err == io.EOF {
 					fmt.Println(addr, " - control line:", string(a))
-					return
 				}
 				if err := proxy.SaveBytes(a, addr); err != nil {
 					fmt.Println(addr, " error while saving", err.Error())
@@ -180,62 +176,26 @@ func (proxy *Proxy) writeToDB(buf *bytes.Buffer, addr string) {
 	}
 }
 
-=======
->>>>>>> 97937c9ae068a3e621fb8af1b1c3c183e30d3c6b
 func (proxy *Proxy) transfer(destination io.WriteCloser, source io.ReadCloser, save bool, address string) {
 	defer destination.Close()
 	defer source.Close()
 
 	buf := new(bytes.Buffer)
 	multiWriter := io.MultiWriter(destination, buf)
-<<<<<<< HEAD
 	if save {
 		go proxy.writeToDB(buf, address)
 	}
-	if _, err := io.Copy(multiWriter, ioutil.NopCloser(source)); err != nil {
-
-	}
+	io.Copy(multiWriter, ioutil.NopCloser(source))
 }
 
 func (proxy *Proxy) SaveBytes(info []byte, host string) error {
 	reader := bufio.NewReader(bytes.NewReader(info))
-=======
-	if _, err := io.Copy(multiWriter, ioutil.NopCloser(source)); err != nil {
-		//println(address, " - error io.Copy ", err.Error())
-		//println(address, " - in error we wrote ", string(buf.Bytes()))
-		//return
-	}
-	//fmt.Println("save me ", string(buf.Bytes()))
-	//fmt.Println(address, " ready to ")
-	if save {
-		str := string(buf.Bytes())
-		requestsByte := strings.Split(str, "\n\n")
-		fmt.Println(address, " split in ", len(requestsByte))
-		for _, request := range requestsByte {
-			// if err := proxy.saveString(request); err != nil {
-			// 	fmt.Println("error while saving", err.Error())
-			// }
-			if err := proxy.SaveBytes(request, address); err != nil {
-				fmt.Println(address, " error while saving", err.Error())
-			} else {
-				fmt.Println(address, " success")
-			}
-			//println("SaveBytes:", string(request))
-		}
-	}
-	//io.Copy(destination, source)
-}
-
-func (proxy *Proxy) SaveBytes(info string, host string) error {
-	reader := bufio.NewReader(strings.NewReader(info))
->>>>>>> 97937c9ae068a3e621fb8af1b1c3c183e30d3c6b
 	r, err := http.ReadRequest(reader)
 	if err != nil {
 		println(host, " - error ReadRequest ", err.Error())
 		return err
 	}
 	r.URL.Host = host
-	println("info:", r.URL.Host)
 	saveRequest(r, true, proxy.db)
 	return nil
 }
@@ -265,21 +225,6 @@ func copyResponseToWriter(w http.ResponseWriter, resp *http.Response) error {
 	copyHeader(w.Header(), resp.Header)
 	_, err := io.Copy(w, resp.Body)
 	return err
-}
-
-func saveReader1(source io.ReadCloser) {
-
-	var bufferRead bytes.Buffer
-	reader, writer := io.Pipe()
-	example := io.TeeReader(source, writer)
-	var some []byte
-	length, err := example.Read(some)
-	fmt.Printf("!!!!!!!!!!!!!!!!!!!!!!!!!!")
-	fmt.Printf("\nBufferRead: %s", &bufferRead)
-	fmt.Printf("\nRead: %s", some)
-	fmt.Printf("\nLength: %d, Error:%v", length, err)
-	source.Close()
-	source = reader
 }
 
 func copyHeader(dst, src http.Header) {
@@ -315,12 +260,12 @@ func (proxy *Proxy) saveString(request string) error {
 	if len(headerElements) != 3 {
 		return errors.New("invalid header -" + rows[0])
 	}
-	var rdb = &models.RequestDB{
-		Method:     headerElements[0],
-		RemoteAddr: headerElements[1],
-		Header:     make(map[string]string),
-	}
 	var (
+		rdb = &models.RequestDB{
+			Method:     headerElements[0],
+			RemoteAddr: headerElements[1],
+			Header:     make(map[string]string),
+		}
 		body      string
 		bodyBegan bool
 	)
@@ -342,20 +287,6 @@ func (proxy *Proxy) saveString(request string) error {
 	rdb.Body = body
 
 	return proxy.db.CreateRequest(rdb)
-	/*
-			GET /schedule/calendar/?start=1569963600&end=1577739600&withCustomEvent=false&filter%5Bdiscipline_id%5D%5B%5D=811&filter%5Blimit%5D=5&csrfmiddlewaretoken=jx4zif3g2UnUUEi34IPmQgrAJrNqPdcM HTTP/1.1
-		proxy-main_1      | Host: park.mail.ru
-		proxy-main_1      | Connection: keep-alive
-		proxy-main_1      | Accept: */ /*
-		proxy-main_1      | X-Requested-With: XMLHttpRequest
-		proxy-main_1      | User-Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.90 Safari/537.36
-		proxy-main_1      | Sec-Fetch-Mode: cors
-		proxy-main_1      | Sec-Fetch-Site: same-origin
-		proxy-main_1      | Referer: https://park.mail.ru/curriculum/program/discipline/811/
-		proxy-main_1      | Accept-Encoding: gzip, deflate, br
-		proxy-main_1      | Accept-Language: ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7
-		proxy-main_1      | Cookie: VID=0ZpedW39CZ1s00000M0i94ns:::0-0-0; csrftoken=jx4zif3g2UnUUEi34IPmQgrAJrNqPdcM; _ym_uid=1570008325776245902; _ym_d=1570008325; _ym_isad=2; _ga=GA1.2.1744217273.1570008325; _gid=GA1.2.702919028.1570008325; _ym_visorc_29019990=w
-	*/
 }
 
 func saveRequest(r *http.Request, https bool, db *database.DB) {
@@ -380,98 +311,8 @@ func saveRequest(r *http.Request, https bool, db *database.DB) {
 	rdb.UserLogin = r.URL.User.Username()
 	rdb.UserPassword, _ = r.URL.User.Password()
 
-	//saveToDB1(r, true)
 	err = db.CreateRequest(rdb)
 	if err != nil {
 		log.Printf("Error, cant save request: %v", err)
 	}
-}
-
-func saveResponse(response *http.Response, https bool) {
-	println("---RESPONSE---")
-	println("w header:", response.Header)
-	println("w body:", response.Body)
-
-	buf := new(bytes.Buffer)
-	buf.ReadFrom(response.Body)
-	s := buf.String() // Does a complete copy of the bytes in the buffer.
-	println("w body:", s)
-}
-
-func saveToDB1(r *http.Request, origin bool) {
-	fmt.Println("--------")
-	if origin {
-		fmt.Println("ORIGIN")
-	} else {
-		fmt.Println("RECOVER")
-	}
-	//fmt.Println("--------")
-	fmt.Println(formatRequest(r))
-	body, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("Error reading body: %v", err)
-		//http.Error(w, "can't read body", http.StatusBadRequest)
-		return
-	}
-	fmt.Println("body " + string(body))
-	// requestDump, err := httputil.DumpRequest(r, true)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-	// fmt.Println(string(requestDump))
-	/*
-		fmt.Println("proto " + r.Proto)
-		fmt.Println("proto " + r.Proto)
-		fmt.Printf("method: %s ", r.Method)
-		fmt.Printf("url: %s ", r.URL)
-		fmt.Println("host " + r.Host)
-		fmt.Println("user name" + r.URL.User.Username())
-		password, _ := r.URL.User.Password()
-		fmt.Println("user password" + password)
-		for k, v := range r.Header {
-			fmt.Println("Header field %q, Value %q\n", k, v)
-		}
-		fmt.Println("host url addr " + r.RemoteAddr)
-		fmt.Println("host url uri " + r.RequestURI)
-		fmt.Println("host url Host " + r.URL.Host)
-		fmt.Println("host url Scheme " + r.URL.Scheme)
-		fmt.Println("host url Opaque " + r.URL.Opaque)
-		fmt.Println("host url Path " + r.URL.Path)
-		fmt.Println("host url Full " + r.URL.String())
-		fmt.Println("RemodeAddr url " + r.RemoteAddr)
-		fmt.Println("RequestURI url " + r.RequestURI)
-		body, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Printf("Error reading body: %v", err)
-			//http.Error(w, "can't read body", http.StatusBadRequest)
-			return
-		}
-		fmt.Println("body " + string(body))
-	*/
-}
-
-func formatRequest(r *http.Request) string {
-	// Create return string
-	var request []string
-	// Add the request string
-	url := fmt.Sprintf("%v %v %v , scheme %v", r.Method, r.URL, r.Proto, r.URL.Scheme)
-	request = append(request, url)
-	// Add the host
-	request = append(request, fmt.Sprintf("Host: %v", r.Host))
-	// Loop through headers
-	for name, headers := range r.Header {
-		name = strings.ToLower(name)
-		for _, h := range headers {
-			request = append(request, fmt.Sprintf("%v: %v", name, h))
-		}
-	}
-
-	// If this is a POST, add post data
-	if r.Method == "POST" {
-		r.ParseForm()
-		request = append(request, "\n")
-		request = append(request, r.Form.Encode())
-	}
-	// Return the request as a string
-	return strings.Join(request, "\n")
 }
