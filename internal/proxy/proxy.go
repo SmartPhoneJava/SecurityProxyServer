@@ -153,6 +153,7 @@ func (proxy *Proxy) HandleTunneling(w http.ResponseWriter, r *http.Request) {
 	go proxy.transfer(destConn, tlsConn, true, r.URL.Host)
 	go proxy.transfer(tlsConn, destConn, false, r.URL.Host)
 }
+<<<<<<< HEAD
 
 func (proxy *Proxy) writeToDB(buf *bytes.Buffer, addr string) {
 	fmt.Println(addr, " - control start")
@@ -179,12 +180,15 @@ func (proxy *Proxy) writeToDB(buf *bytes.Buffer, addr string) {
 	}
 }
 
+=======
+>>>>>>> 97937c9ae068a3e621fb8af1b1c3c183e30d3c6b
 func (proxy *Proxy) transfer(destination io.WriteCloser, source io.ReadCloser, save bool, address string) {
 	defer destination.Close()
 	defer source.Close()
 
 	buf := new(bytes.Buffer)
 	multiWriter := io.MultiWriter(destination, buf)
+<<<<<<< HEAD
 	if save {
 		go proxy.writeToDB(buf, address)
 	}
@@ -195,6 +199,36 @@ func (proxy *Proxy) transfer(destination io.WriteCloser, source io.ReadCloser, s
 
 func (proxy *Proxy) SaveBytes(info []byte, host string) error {
 	reader := bufio.NewReader(bytes.NewReader(info))
+=======
+	if _, err := io.Copy(multiWriter, ioutil.NopCloser(source)); err != nil {
+		//println(address, " - error io.Copy ", err.Error())
+		//println(address, " - in error we wrote ", string(buf.Bytes()))
+		//return
+	}
+	//fmt.Println("save me ", string(buf.Bytes()))
+	//fmt.Println(address, " ready to ")
+	if save {
+		str := string(buf.Bytes())
+		requestsByte := strings.Split(str, "\n\n")
+		fmt.Println(address, " split in ", len(requestsByte))
+		for _, request := range requestsByte {
+			// if err := proxy.saveString(request); err != nil {
+			// 	fmt.Println("error while saving", err.Error())
+			// }
+			if err := proxy.SaveBytes(request, address); err != nil {
+				fmt.Println(address, " error while saving", err.Error())
+			} else {
+				fmt.Println(address, " success")
+			}
+			//println("SaveBytes:", string(request))
+		}
+	}
+	//io.Copy(destination, source)
+}
+
+func (proxy *Proxy) SaveBytes(info string, host string) error {
+	reader := bufio.NewReader(strings.NewReader(info))
+>>>>>>> 97937c9ae068a3e621fb8af1b1c3c183e30d3c6b
 	r, err := http.ReadRequest(reader)
 	if err != nil {
 		println(host, " - error ReadRequest ", err.Error())
