@@ -140,9 +140,10 @@ func applyLimit(statement *string, limit string) {
 }
 
 func applyDesc(statement *string, last string) {
-	if last == "true" || last == "1" || last == "+" {
-		*statement += " order by id desc "
+	if last == "false" || last == "0" || last == "-" {
+		return
 	}
+	*statement += " order by id desc "
 }
 
 func (db *DB) GetRequests(scheme, method, limit, last, address string) (*models.RequestsDB, error) {
