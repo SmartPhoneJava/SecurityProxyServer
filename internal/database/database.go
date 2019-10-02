@@ -105,12 +105,18 @@ func isInside(origin string, variants ...string) bool {
 }
 
 func applyScheme(statement *string, counter *int, scheme string) {
+	if strings.Contains(scheme, "'") || strings.Contains(scheme, ";") {
+		return
+	}
 	applyParameter(statement, counter, addToQuery("scheme", scheme), func() bool {
 		return scheme == "http" || scheme == "https"
 	})
 }
 
 func applyMethod(statement *string, counter *int, method string) {
+	if strings.Contains(method, "'") || strings.Contains(method, ";") {
+		return
+	}
 	applyParameter(statement, counter, addToQuery("method", strings.ToUpper(method)), func() bool {
 		var meth = strings.ToLower(method)
 		return isInside(meth, "connect", "post", "get", "put", "options", "delete", "head")
@@ -118,7 +124,10 @@ func applyMethod(statement *string, counter *int, method string) {
 }
 
 func applyAddress(statement *string, counter *int, address string) {
-	applyParameter(statement, counter, addToQuery("address", address), func() bool {
+	if strings.Contains(address, "'") || strings.Contains(address, ";") {
+		return
+	}
+	applyParameter(statement, counter, "POSITION (lower('"+address+"') IN lower(address)) > 0", func() bool {
 		return address != ""
 	})
 }

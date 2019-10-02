@@ -153,40 +153,48 @@ func (proxy *Proxy) HandleTunneling(w http.ResponseWriter, r *http.Request) {
 	go proxy.transfer(destConn, tlsConn, true, r.URL.Host)
 	go proxy.transfer(tlsConn, destConn, false, r.URL.Host)
 }
+
+func (proxy *Proxy) writeToDB(buf *bytes.Buffer, addr string) {
+	fmt.Println(addr, " - control start")
+	a := make([]byte, 1024*1024*8)
+	for {
+		for {
+			select {
+			case <-time.After(3 * time.Second):
+				fmt.Println(addr, " - control timeout")
+				return
+			default:
+				_, err := buf.Read(a)
+				if err == io.EOF {
+					fmt.Println(addr, " - control line:", string(a))
+					return
+				}
+				if err := proxy.SaveBytes(a, addr); err != nil {
+					fmt.Println(addr, " error while saving", err.Error())
+				} else {
+					fmt.Println(addr, " success")
+				}
+			}
+		}
+	}
+}
+
 func (proxy *Proxy) transfer(destination io.WriteCloser, source io.ReadCloser, save bool, address string) {
 	defer destination.Close()
 	defer source.Close()
 
 	buf := new(bytes.Buffer)
 	multiWriter := io.MultiWriter(destination, buf)
-	if _, err := io.Copy(multiWriter, ioutil.NopCloser(source)); err != nil {
-		//println(address, " - error io.Copy ", err.Error())
-		//println(address, " - in error we wrote ", string(buf.Bytes()))
-		//return
-	}
-	//fmt.Println("save me ", string(buf.Bytes()))
-	//fmt.Println(address, " ready to ")
 	if save {
-		str := string(buf.Bytes())
-		requestsByte := strings.Split(str, "\n\n")
-		fmt.Println(address, " split in ", len(requestsByte))
-		for _, request := range requestsByte {
-			// if err := proxy.saveString(request); err != nil {
-			// 	fmt.Println("error while saving", err.Error())
-			// }
-			if err := proxy.SaveBytes(request, address); err != nil {
-				fmt.Println(address, " error while saving", err.Error())
-			} else {
-				fmt.Println(address, " success")
-			}
-			//println("SaveBytes:", string(request))
-		}
+		go proxy.writeToDB(buf, address)
 	}
-	//io.Copy(destination, source)
+	if _, err := io.Copy(multiWriter, ioutil.NopCloser(source)); err != nil {
+
+	}
 }
 
-func (proxy *Proxy) SaveBytes(info string, host string) error {
-	reader := bufio.NewReader(strings.NewReader(info))
+func (proxy *Proxy) SaveBytes(info []byte, host string) error {
+	reader := bufio.NewReader(bytes.NewReader(info))
 	r, err := http.ReadRequest(reader)
 	if err != nil {
 		println(host, " - error ReadRequest ", err.Error())
