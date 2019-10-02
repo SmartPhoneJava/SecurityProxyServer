@@ -1,0 +1,33 @@
+version: '3'
+services:
+
+  proxy-db:
+    build:
+      dockerfile: Dockerfile
+      context: ./extra/postgresql/main/
+    ports:
+      - "5429:5432"    
+
+  proxy-main:
+    build:
+      dockerfile: ./services/proxy/Dockerfile
+      context: .
+    depends_on:
+      - "proxy-db"
+    ports:
+      - 8888:8888
+    command: /bin/sh -c "go run services/proxy/main.go"
+    volumes:
+    - ./:/proxy
+
+  proxy-repeater:
+    build:
+      dockerfile: ./services/repeater/Dockerfile
+      context: .
+    depends_on:
+      - "proxy-db"
+    ports:
+      - 8889:8889
+    command: /bin/sh -c "go run services/repeater/main.go"
+    volumes:
+    - ./:/proxy
