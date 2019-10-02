@@ -165,6 +165,7 @@ func (proxy *Proxy) writeToDB(buf *bytes.Buffer, addr string) {
 				_, err := buf.Read(a)
 				if err == io.EOF {
 					fmt.Println(addr, " - control line:", string(a))
+					return
 				}
 				if err := proxy.SaveBytes(a, addr); err != nil {
 					fmt.Println(addr, " error while saving", err.Error())
